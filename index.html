@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
+  <canvas id="stage"></canvas>
   <div id="map"></div>
   <form id="search" autocomplete="off">
     <input id="q" type="search" placeholder="Hősök tere, Budapest" enterkeyhint="search" aria-label="Cél">
@@ -37,6 +38,8 @@
   <p id="status">Keresés egy célra.</p>
   <button type="button" id="go" hidden>Indulás</button>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="./vendor/three.min.js"></script>
+  <script src="./world.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

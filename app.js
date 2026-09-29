@@ -147,11 +147,11 @@
   function paintBanner() {
     var step = currentStep();
     var remain = Math.max(0, step.at + step.distance - traveled);
-    $("banner").hidden = false;
     $("turnDist").textContent = fmtRemain(remain);
     $("turnText").textContent = step.text;
     $("turnStreet").textContent = step.street;
     highlightRow(step);
+    if (window.Clay) window.Clay.setDrive(traveled, step.text, step.street, fmtRemain(remain));
   }
 
   function fillTable() {
@@ -203,10 +203,7 @@
     var apply = function () {
       drawLine();
       fillTable();
-      var pos = placeOnRoute(route, 0);
-      if (!marker) marker = new maplibregl.Marker({ color: "#0e8a45" }).setLngLat([pos.lng, pos.lat]).addTo(map);
-      else marker.setLngLat([pos.lng, pos.lat]);
-      map.fitBounds(boundsOf(route.coords), { padding: 80, duration: 400 });
+      if (window.Clay) window.Clay.setRoute(route);
       paintBanner();
       $("go").hidden = false;
       setStatus(item.label + " kiválasztva: " + fmtDist(item.distance) + ", " + route.steps.length + " manőver. Hang: " + voiceFiles.length + " fájl előkészítve, nincs lejátszás.");
@@ -306,12 +303,6 @@
     var dt = Math.min(0.05, (now - lastT) / 1000);
     lastT = now;
     traveled += SPEED * dt;
-    var pos = placeOnRoute(route, traveled);
-    marker.setLngLat([pos.lng, pos.lat]);
-    if (now - lastCam > 200) {
-      lastCam = now;
-      map.easeTo({ center: [pos.lng, pos.lat], bearing: pos.bearing, duration: 200 });
-    }
     paintBanner();
     if (traveled >= route.length) {
       stop();
