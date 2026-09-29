@@ -1,0 +1,154 @@
+html, body, #map {
+  margin: 0;
+  height: 100%;
+  font-family: "Segoe UI", sans-serif;
+  background: #d7e4c8;
+}
+
+#search {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+#q {
+  flex: 1;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 16px;
+}
+
+#search button,
+#go,
+.pick {
+  border: 0;
+  border-radius: 12px;
+  background: #0e8a45;
+  color: #fff;
+  font-weight: 700;
+}
+
+#search button,
+#go {
+  padding: 0 14px;
+}
+
+#results,
+#routes {
+  position: absolute;
+  z-index: 2;
+  left: 12px;
+  width: min(420px, calc(100% - 24px));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: #fff;
+  border-radius: 12px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+#results { top: 64px; }
+#routes { top: 64px; }
+
+#results button,
+#routes button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid #e6e6e6;
+  background: #fff;
+  padding: 10px 14px;
+  font-size: 15px;
+}
+
+#routes button[aria-current="true"] {
+  background: #e7f6ee;
+}
+
+#panel {
+  position: absolute;
+  z-index: 2;
+  top: 64px;
+  right: 12px;
+  width: min(420px, calc(100% - 24px));
+  max-height: calc(100% - 220px);
+  overflow: auto;
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px 12px 12px;
+}
+
+#panel h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th, td {
+  text-align: left;
+  padding: 6px 4px;
+  border-bottom: 1px solid #eee;
+  vertical-align: top;
+}
+
+tr.active {
+  background: #e7f6ee;
+  font-weight: 700;
+}
+
+#banner {
+  position: absolute;
+  z-index: 2;
+  left: 12px;
+  right: 12px;
+  bottom: 64px;
+  background: #0e8a45;
+  color: #fff;
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+
+#turnText {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+#turnDist,
+#turnStreet {
+  margin: 4px 0 0;
+  font-size: 16px;
+}
+
+#status {
+  position: absolute;
+  z-index: 2;
+  left: 12px;
+  bottom: 12px;
+  margin: 0;
+  max-width: calc(100% - 140px);
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+#go {
+  position: absolute;
+  z-index: 2;
+  right: 12px;
+  bottom: 12px;
+  height: 42px;
+}
