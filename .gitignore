@@ -7,3 +7,4 @@ android/captures/
 .idea/
 *.apk
 !dist/*.apk
+!dist/*.zip

@@ -1,11 +1,17 @@
 # Navigáció
 
-Telefonos Android-alkalmazás. Nem weboldal.
+Telefonos Android-alkalmazás.
 
 ## Letöltés
 
-Telepítő: [dist/Navigacio.apk](https://github.com/reiko1866-ui/Navig-ci-/raw/main/dist/Navigacio.apk)
+A tárolóból a nyers fájl a telefonon gyakran beragad. Innen töltsd:
 
-A telefonon engedd meg az ismeretlen forrásból való telepítést. Első indításkor a helyhozzáférést is.
+https://github.com/reiko1866-ui/Navig-ci-/releases/download/apk-1/Navigacio.apk
 
-A hangok, a kanyartábla, a sebességhatár és a forgalomfigyelő a csomagban van.
+Ha az APK még mindig nem fejeződik be, a tömörített változat:
+
+https://github.com/reiko1866-ui/Navig-ci-/releases/download/apk-1/Navigacio.zip
+
+A kiadás oldala: https://github.com/reiko1866-ui/Navig-ci-/releases/tag/apk-1
+
+Telepítés után engedd meg az ismeretlen forrást, majd a helyhozzáférést.
