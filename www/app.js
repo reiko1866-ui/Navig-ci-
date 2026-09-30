@@ -75,6 +75,27 @@
     return "Haladj tovább";
   }
 
+  function kindOf(step) {
+    var man = step.maneuver || {};
+    var type = String(man.type || "").toLowerCase();
+    var mod = String(man.modifier || "").toLowerCase();
+    if (type === "arrive") return "arrive";
+    if (type === "depart") return "start";
+    if (type === "roundabout" || type === "rotary" || type === "exit roundabout") return "roundabout";
+    if (type === "notification" && /ferry|komp/.test(String(step.name || "").toLowerCase())) return "ferryOn";
+    if (type === "off ramp" || type === "exit") return "motorwayOff";
+    if (type === "on ramp" || type === "merge") return "motorwayOn";
+    if (mod.indexOf("uturn") >= 0) return "uturn";
+    if ((mod.indexOf("slight") >= 0 || mod.indexOf("keep") >= 0) && mod.indexOf("left") >= 0) return "leftKeep";
+    if ((mod.indexOf("slight") >= 0 || mod.indexOf("keep") >= 0) && mod.indexOf("right") >= 0) return "rightKeep";
+    if (mod.indexOf("sharp") >= 0 && mod.indexOf("left") >= 0) return "left";
+    if (mod.indexOf("sharp") >= 0 && mod.indexOf("right") >= 0) return "rightSharp";
+    if (mod.indexOf("left") >= 0) return "left";
+    if (mod.indexOf("right") >= 0) return "right";
+    if (type === "continue" || type === "new name" || type === "notification" || type === "fork" || type === "end of road") return "straight";
+    return "straight";
+  }
+
   function buildRoute(osrmRoute, index) {
     var steps = [];
     var at = 0;
@@ -84,6 +105,7 @@
       steps.push({
         at: at,
         text: labelOf(step),
+        kind: kindOf(step),
         street: step.name || "",
         distance: dist
       });
@@ -156,6 +178,7 @@
     highlightRow(step);
     if (window.Clay) window.Clay.setDrive(traveled, step.text, step.street, fmtRemain(remain));
     paintLimit();
+    if (running && window.Voice) window.Voice.tick(route, traveled);
   }
 
   function paintLimit() {
@@ -194,10 +217,10 @@
       item.limits = segments;
       paintLimit();
       var posted = segments.filter(function (seg) { return seg.posted; }).length;
-      setStatus(item.label + ": " + fmtDist(item.distance) + ". Sebességhatár " + segments.length + " szakasz, ebből " + posted + " tábla szerint.");
+      setStatus(item.label + ": " + fmtDist(item.distance) + ". Sebességhatár " + segments.length + " szakasz, ebből " + posted + " tábla szerint. " + heardLine() + ".");
     }).catch(function () {
       if (token !== limitToken) return;
-      setStatus("A sebességhatár most nem elérhető. Az út megvan.");
+      setStatus("A sebességhatár most nem elérhető. Az út megvan. " + heardLine() + ".");
     });
   }
 
@@ -231,6 +254,7 @@
     });
     fillTable();
     if (window.Clay) window.Clay.setRoute(route);
+    if (window.Voice) window.Voice.reset();
     paintBanner();
     $("go").hidden = false;
     setStatus(item.label + " kiválasztva: " + fmtDist(item.distance) + ". Sebességhatár olvasása…");
@@ -357,22 +381,26 @@
     }
     if (traveled >= route.length) {
       stop();
-      setStatus("Megérkeztél. Hang: " + voiceFiles.length + " fájl előkészítve, nincs lejátszás.");
+      if (window.Voice) window.Voice.play("arrive", "now");
+      setStatus("Megérkeztél. Hang: " + heardLine() + ".");
       return;
     }
     raf = requestAnimationFrame(tick);
   }
 
+  function heardLine() {
+    if (!window.Voice) return voiceFiles.length + " hang";
+    return window.Voice.heard() + "/" + window.Voice.total() + " hang elhangzott";
+  }
+
   function prepareVoices() {
-    return fetch("./voice/files.json")
-      .then(function (res) { return res.json(); })
-      .then(function (list) {
-        voiceFiles = Array.isArray(list) ? list : [];
-        setStatus("Keresés egy célra. Hang: " + voiceFiles.length + " fájl előkészítve, nincs lejátszás.");
-      })
-      .catch(function () {
-        setStatus("Keresés egy célra. A hanglista nem tölthető.");
-      });
+    if (!window.Voice) return Promise.resolve();
+    return window.Voice.load().then(function () {
+      voiceFiles = Array(window.Voice.total());
+      setStatus("Keresés egy célra. " + heardLine() + ", minden irány él.");
+    }).catch(function () {
+      setStatus("Keresés egy célra. A hanglista nem tölthető.");
+    });
   }
 
   $("search").addEventListener("submit", function (event) {
@@ -387,6 +415,7 @@
     running = true;
     lastT = performance.now();
     lastCam = 0;
+    if (window.Voice) window.Voice.start();
     raf = requestAnimationFrame(tick);
   });
 
@@ -409,6 +438,7 @@
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
     gps.at = Date.now();
     gps.speed = Number.isFinite(speed) && speed >= 0 ? speed : null;
+    if (window.Voice) window.Voice.gps(true);
     if (!route) {
       origin = { lng: lng, lat: lat };
       return;
