@@ -225,3 +225,22 @@ tr.active {
   font-weight: 800;
   padding: 8px 12px;
 }
+
+#cue {
+  position: absolute;
+  z-index: 3;
+  left: 12px;
+  right: 12px;
+  bottom: 118px;
+  margin: 0;
+  background: #3c3150;
+  color: #fff;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+#cue[hidden] {
+  display: none;
+}

@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var LOCAL = { code: 2, name: "1.0.1" };
+  var LOCAL = { code: 3, name: "1.0.2" };
   var API = "https://api.github.com/repos/reiko1866-ui/Navig-ci-/releases?per_page=8";
 
   function $(id) {

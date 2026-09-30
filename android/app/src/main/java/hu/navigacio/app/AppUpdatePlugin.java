@@ -32,8 +32,8 @@ public class AppUpdatePlugin extends Plugin {
             out.put("code", code);
             out.put("name", info.versionName);
         } catch (Exception e) {
-            out.put("code", 2);
-            out.put("name", "1.0.1");
+            out.put("code", 3);
+            out.put("name", "1.0.2");
         }
         call.resolve(out);
     }
@@ -84,7 +84,7 @@ public class AppUpdatePlugin extends Plugin {
             conn.setInstanceFollowRedirects(false);
             conn.setConnectTimeout(20000);
             conn.setReadTimeout(60000);
-            conn.setRequestProperty("User-Agent", "Navigacio/1.0.1");
+            conn.setRequestProperty("User-Agent", "Navigacio/1.0.2");
             conn.connect();
             int code = conn.getResponseCode();
             if (code >= 300 && code < 400) {

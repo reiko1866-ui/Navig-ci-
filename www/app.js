@@ -81,8 +81,14 @@
     var mod = String(man.modifier || "").toLowerCase();
     if (type === "arrive") return "arrive";
     if (type === "depart") return "";
-    if (type === "roundabout" || type === "rotary" || type === "exit roundabout") return "roundabout";
+    if (type === "exit roundabout" || type === "exit rotary") return "";
+    if (type === "roundabout" || type === "rotary") return "roundabout";
     if (type === "notification" && /ferry|komp/.test(String(step.name || "").toLowerCase())) return "ferryOn";
+    if (type === "continue" || type === "new name" || type === "notification") {
+      if ((mod.indexOf("slight") >= 0 || mod.indexOf("keep") >= 0) && mod.indexOf("left") >= 0) return "leftKeep";
+      if ((mod.indexOf("slight") >= 0 || mod.indexOf("keep") >= 0) && mod.indexOf("right") >= 0) return "rightKeep";
+      return "";
+    }
     if (type === "off ramp" || type === "exit motorway" || type === "off_ramp") return "motorwayOff";
     if (type === "on ramp" || type === "merge" || type === "on_ramp") return "motorwayOn";
     if (mod.indexOf("uturn") >= 0) return "uturn";
@@ -95,17 +101,27 @@
     return "";
   }
 
+  function streetOf(step) {
+    var name = String(step.name || "").replace(/\s+/g, " ").trim();
+    if (name && !/^unnamed$/i.test(name)) return name.split(/[;,]/)[0].trim();
+    var ref = String(step.ref || "").split(";")[0].trim();
+    return ref;
+  }
+
   function buildRoute(osrmRoute, index) {
     var steps = [];
     var at = 0;
     var raw = (osrmRoute.legs && osrmRoute.legs[0] && osrmRoute.legs[0].steps) || [];
     raw.forEach(function (step) {
       var dist = Number(step.distance) || 0;
+      var man = step.maneuver || {};
       steps.push({
         at: at,
         text: labelOf(step),
         kind: kindOf(step),
-        street: step.name || "",
+        street: streetOf(step),
+        exit: Number(man.exit) || 0,
+        ref: String(step.ref || "").split(";")[0].trim(),
         distance: dist
       });
       at += dist;
@@ -129,7 +145,8 @@
       length: length,
       nodes: ann.nodes || [],
       segDist: ann.distance || [],
-      limits: []
+      limits: [],
+      dest: (destination && destination.label) || ""
     };
   }
 
@@ -322,39 +339,82 @@
   }
 
   function labelPlace(p) {
-    return [p.name, p.street, p.city, p.country].filter(Boolean).join(", ");
+    return [p.name, p.housenumber || p.house_number, p.street, p.district, p.city, p.country]
+      .filter(Boolean)
+      .filter(function (part, i, all) { return all.indexOf(part) === i; })
+      .join(", ");
+  }
+
+  function photonHit(feature) {
+    var p = feature.properties || {};
+    var coords = (feature.geometry || {}).coordinates || [];
+    return { lng: coords[0], lat: coords[1], label: labelPlace(p) };
+  }
+
+  function nominatimHit(item) {
+    var addr = item.address || {};
+    var name = item.name || addr.amenity || addr.tourism || addr.shop || addr.road || "";
+    var label = [name, addr.house_number, addr.road && addr.road !== name ? addr.road : "", addr.suburb, addr.city || addr.town || addr.village || addr.municipality]
+      .filter(Boolean)
+      .filter(function (part, i, all) { return all.indexOf(part) === i; })
+      .join(", ");
+    if (!label) label = item.display_name || "";
+    return { lng: Number(item.lon), lat: Number(item.lat), label: label };
+  }
+
+  function paintHits(hits) {
+    var box = $("results");
+    box.innerHTML = "";
+    var seen = {};
+    var n = 0;
+    hits.forEach(function (hit) {
+      if (!Number.isFinite(hit.lng) || !Number.isFinite(hit.lat) || !hit.label) return;
+      var key = hit.label + "|" + hit.lng.toFixed(5) + "|" + hit.lat.toFixed(5);
+      if (seen[key]) return;
+      seen[key] = 1;
+      var li = document.createElement("li");
+      var button = document.createElement("button");
+      button.type = "button";
+      button.textContent = hit.label;
+      button.addEventListener("click", function () { plan(hit); });
+      li.appendChild(button);
+      box.appendChild(li);
+      n++;
+    });
+    box.hidden = n === 0;
+    setStatus(n ? n + " találat. Válassz célt." : "Nincs találat.");
+  }
+
+  function searchNominatim(query) {
+    var url = "https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=8&countrycodes=hu&accept-language=hu&q=" +
+      encodeURIComponent(query);
+    return fetch(url, { headers: { Accept: "application/json", "Accept-Language": "hu" } })
+      .then(function (res) { return res.json(); })
+      .then(function (list) {
+        return Array.isArray(list) ? list.map(nominatimHit) : [];
+      });
   }
 
   function search(query) {
     setStatus("Keresés…");
-    fetch("https://photon.komoot.io/api/?limit=6&q=" + encodeURIComponent(query))
+    var url = "https://photon.komoot.io/api/?limit=8&lat=" + origin.lat + "&lon=" + origin.lng +
+      "&bbox=16.1,45.7,22.9,48.6&q=" + encodeURIComponent(query);
+    fetch(url)
       .then(function (res) { return res.json(); })
       .then(function (data) {
-        var features = (data && data.features) || [];
-        var box = $("results");
-        box.innerHTML = "";
-        if (!features.length) {
-          box.hidden = true;
-          setStatus("Nincs találat.");
+        var hits = ((data && data.features) || []).map(photonHit).filter(function (hit) {
+          return Number.isFinite(hit.lng) && hit.label;
+        });
+        if (hits.length) {
+          paintHits(hits);
           return;
         }
-        features.forEach(function (feature) {
-          var p = feature.properties || {};
-          var coords = (feature.geometry || {}).coordinates || [];
-          var li = document.createElement("li");
-          var button = document.createElement("button");
-          button.type = "button";
-          button.textContent = labelPlace(p);
-          button.addEventListener("click", function () {
-            plan({ lng: coords[0], lat: coords[1], label: labelPlace(p) });
-          });
-          li.appendChild(button);
-          box.appendChild(li);
-        });
-        box.hidden = false;
-        setStatus(features.length + " találat. Válassz célt.");
+        setStatus("Pontosabb címkeresés…");
+        return searchNominatim(query).then(paintHits);
       }).catch(function () {
-        setStatus("A keresés nem válaszolt.");
+        searchNominatim(query).then(paintHits).catch(function () {
+          setStatus("A keresés nem válaszolt.");
+        });
       });
   }
 
@@ -380,23 +440,28 @@
     }
     if (traveled >= route.length) {
       stop();
-      if (window.Voice) window.Voice.play("arrive", "now");
-      setStatus("Megérkeztél. Hang: " + heardLine() + ".");
+      if (window.Voice && window.Voice.speak) {
+        window.Voice.speak(window.NavCue
+          ? window.NavCue.line({ kind: "arrive" }, 0, route.dest, null)
+          : "Megérkeztél.", true);
+      }
+      setStatus(route.dest ? "Megérkeztél, " + route.dest + "." : "Megérkeztél.");
       return;
     }
     raf = requestAnimationFrame(tick);
   }
 
   function heardLine() {
-    if (!window.Voice) return voiceFiles.length + " hang";
-    return window.Voice.heard() + "/" + window.Voice.total() + " hang elhangzott";
+    var last = window.Voice && window.Voice.last && window.Voice.last();
+    if (last) return last;
+    return "A hang a kanyart, a távot és az utcanevet mondja.";
   }
 
   function prepareVoices() {
     if (!window.Voice) return Promise.resolve();
     return window.Voice.load().then(function () {
       voiceFiles = Array(window.Voice.total());
-      setStatus("Keresés egy célra. " + heardLine() + ", minden irány él.");
+      setStatus("Keresés egy célra. A hang a következő kanyart mondja, utcával.");
     }).catch(function () {
       setStatus("Keresés egy célra. A hanglista nem tölthető.");
     });
@@ -414,7 +479,7 @@
     running = true;
     lastT = performance.now();
     lastCam = 0;
-    if (window.Voice) window.Voice.start();
+    if (window.Voice) window.Voice.start(route, traveled);
     raf = requestAnimationFrame(tick);
   });
 
