@@ -13,14 +13,9 @@
   var marker = null;
   var voiceFiles = [];
   var SPEED = 50 / 3.6;
-
-  var map = new maplibregl.Map({
-    container: "map",
-    style: "https://tiles.openfreemap.org/styles/liberty",
-    center: [origin.lng, origin.lat],
-    zoom: 13
-  });
-  map.addControl(new maplibregl.NavigationControl(), "top-right");
+  var limitToken = 0;
+  var limitShown = "";
+  var nextShown = "";
 
   function $(id) {
     return document.getElementById(id);
@@ -91,6 +86,8 @@
       });
       at += dist;
     });
+    var leg = (osrmRoute.legs && osrmRoute.legs[0]) || {};
+    var ann = leg.annotation || {};
     var coords = (((osrmRoute.geometry || {}).coordinates) || []).map(function (c) {
       return { lng: c[0], lat: c[1] };
     });
@@ -105,7 +102,10 @@
       steps: steps,
       coords: coords,
       cum: cum,
-      length: length
+      length: length,
+      nodes: ann.nodes || [],
+      segDist: ann.distance || [],
+      limits: []
     };
   }
 
@@ -152,6 +152,50 @@
     $("turnStreet").textContent = step.street;
     highlightRow(step);
     if (window.Clay) window.Clay.setDrive(traveled, step.text, step.street, fmtRemain(remain));
+    paintLimit();
+  }
+
+  function paintLimit() {
+    var segments = route && route.limits;
+    var cur = window.SpeedLimits ? window.SpeedLimits.at(segments, traveled) : null;
+    var disc = $("limit");
+    var key = cur ? cur.limit + ":" + (cur.posted ? "1" : "0") : "";
+    if (key !== limitShown) {
+      limitShown = key;
+      disc.hidden = !cur;
+      if (cur) {
+        $("limitVal").textContent = String(cur.limit);
+        disc.dataset.posted = cur.posted ? "true" : "false";
+      }
+    }
+    var nxt = cur && window.SpeedLimits.nextChange(segments, traveled);
+    var ahead = nxt ? Math.max(10, Math.round(nxt.dist / 10) * 10) : 0;
+    var nextText = nxt && nxt.dist < 800 ? ahead + " m múlva " + nxt.limit : "";
+    if (nextText !== nextShown) {
+      nextShown = nextText;
+      $("limitNext").hidden = !nextText;
+      $("limitNext").textContent = nextText;
+    }
+  }
+
+  function loadLimits(item) {
+    var token = ++limitToken;
+    item.limits = [];
+    limitShown = "";
+    nextShown = "";
+    $("limit").hidden = true;
+    $("limitNext").hidden = true;
+    if (!window.SpeedLimits) return;
+    window.SpeedLimits.load(item).then(function (segments) {
+      if (token !== limitToken || route !== item) return;
+      item.limits = segments;
+      paintLimit();
+      var posted = segments.filter(function (seg) { return seg.posted; }).length;
+      setStatus(item.label + ": " + fmtDist(item.distance) + ". Sebességhatár " + segments.length + " szakasz, ebből " + posted + " tábla szerint.");
+    }).catch(function () {
+      if (token !== limitToken) return;
+      setStatus("A sebességhatár most nem elérhető. Az út megvan.");
+    });
   }
 
   function fillTable() {
@@ -173,24 +217,6 @@
     });
   }
 
-  function drawLine() {
-    var data = {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: route.coords.map(function (p) { return [p.lng, p.lat]; }) }
-    };
-    if (map.getSource("route")) {
-      map.getSource("route").setData(data);
-      return;
-    }
-    map.addSource("route", { type: "geojson", data: data });
-    map.addLayer({
-      id: "route",
-      type: "line",
-      source: "route",
-      paint: { "line-color": "#0e8a45", "line-width": 6 }
-    });
-  }
-
   function showRoute(item) {
     stop();
     route = item;
@@ -200,22 +226,12 @@
     Array.prototype.forEach.call($("routes").querySelectorAll("button"), function (button) {
       button.setAttribute("aria-current", button.dataset.index === String(item.index) ? "true" : "false");
     });
-    var apply = function () {
-      drawLine();
-      fillTable();
-      if (window.Clay) window.Clay.setRoute(route);
-      paintBanner();
-      $("go").hidden = false;
-      setStatus(item.label + " kiválasztva: " + fmtDist(item.distance) + ", " + route.steps.length + " manőver. Hang: " + voiceFiles.length + " fájl előkészítve, nincs lejátszás.");
-    };
-    if (map.isStyleLoaded()) apply();
-    else map.once("load", apply);
-  }
-
-  function boundsOf(coords) {
-    var b = new maplibregl.LngLatBounds(coords[0], coords[0]);
-    coords.forEach(function (p) { b.extend([p.lng, p.lat]); });
-    return b;
+    fillTable();
+    if (window.Clay) window.Clay.setRoute(route);
+    paintBanner();
+    $("go").hidden = false;
+    setStatus(item.label + " kiválasztva: " + fmtDist(item.distance) + ". Sebességhatár olvasása…");
+    loadLimits(item);
   }
 
   function showRouteChoices(list) {
@@ -242,7 +258,7 @@
     $("results").hidden = true;
     var url = "https://router.project-osrm.org/route/v1/driving/" +
       origin.lng + "," + origin.lat + ";" + dest.lng + "," + dest.lat +
-      "?overview=full&geometries=geojson&steps=true&alternatives=true";
+      "?overview=full&geometries=geojson&steps=true&alternatives=true&annotations=nodes,distance";
     fetch(url).then(function (res) { return res.json(); }).then(function (data) {
       var routes = (data && data.routes) || [];
       if (!routes.length) {

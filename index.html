@@ -4,12 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Navigáció</title>
-  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
   <canvas id="stage"></canvas>
-  <div id="map"></div>
   <form id="search" autocomplete="off">
     <input id="q" type="search" placeholder="Hősök tere, Budapest" enterkeyhint="search" aria-label="Cél">
     <button type="submit">Keresés</button>
@@ -36,8 +34,10 @@
     <p id="turnStreet"></p>
   </div>
   <p id="status">Keresés egy célra.</p>
+  <p id="limitNext" hidden></p>
+  <div id="limit" hidden><span id="limitVal">—</span></div>
   <button type="button" id="go" hidden>Indulás</button>
-  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="./limits.js"></script>
   <script src="./vendor/three.min.js"></script>
   <script src="./world.js"></script>
   <script src="./app.js"></script>
