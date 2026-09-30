@@ -139,6 +139,12 @@
     disposed = [];
   }
 
+  function fit(text, n) {
+    text = String(text || "");
+    if (text.length <= n) return text;
+    return text.slice(0, n - 1) + "…";
+  }
+
   function paintSign(distance, maneuver, street) {
     var key = distance + "|" + maneuver + "|" + street;
     if (key === signKey) return;
@@ -153,11 +159,11 @@
     ctx.textAlign = "center";
     ctx.fillText(distance || "—", 256, 110);
     ctx.fillStyle = "#3c3150";
-    ctx.font = "700 42px Segoe UI, sans-serif";
-    ctx.fillText(maneuver || "", 256, 168);
+    ctx.font = "700 36px Segoe UI, sans-serif";
+    ctx.fillText(fit(maneuver || "", 22), 256, 168);
     ctx.fillStyle = "#8a7b9e";
-    ctx.font = "500 28px Segoe UI, sans-serif";
-    ctx.fillText(street || "", 256, 208);
+    ctx.font = "600 30px Segoe UI, sans-serif";
+    ctx.fillText(fit(street || "", 26), 256, 212);
     signTex.needsUpdate = true;
   }
 

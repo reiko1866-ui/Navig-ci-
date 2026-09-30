@@ -80,11 +80,11 @@
     var type = String(man.type || "").toLowerCase();
     var mod = String(man.modifier || "").toLowerCase();
     if (type === "arrive") return "arrive";
-    if (type === "depart") return "start";
+    if (type === "depart") return "";
     if (type === "roundabout" || type === "rotary" || type === "exit roundabout") return "roundabout";
     if (type === "notification" && /ferry|komp/.test(String(step.name || "").toLowerCase())) return "ferryOn";
-    if (type === "off ramp" || type === "exit") return "motorwayOff";
-    if (type === "on ramp" || type === "merge") return "motorwayOn";
+    if (type === "off ramp" || type === "exit motorway" || type === "off_ramp") return "motorwayOff";
+    if (type === "on ramp" || type === "merge" || type === "on_ramp") return "motorwayOn";
     if (mod.indexOf("uturn") >= 0) return "uturn";
     if ((mod.indexOf("slight") >= 0 || mod.indexOf("keep") >= 0) && mod.indexOf("left") >= 0) return "leftKeep";
     if ((mod.indexOf("slight") >= 0 || mod.indexOf("keep") >= 0) && mod.indexOf("right") >= 0) return "rightKeep";
@@ -92,8 +92,7 @@
     if (mod.indexOf("sharp") >= 0 && mod.indexOf("right") >= 0) return "rightSharp";
     if (mod.indexOf("left") >= 0) return "left";
     if (mod.indexOf("right") >= 0) return "right";
-    if (type === "continue" || type === "new name" || type === "notification" || type === "fork" || type === "end of road") return "straight";
-    return "straight";
+    return "";
   }
 
   function buildRoute(osrmRoute, index) {

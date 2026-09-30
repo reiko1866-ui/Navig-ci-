@@ -2,25 +2,30 @@
   "use strict";
 
   var KEY = "nav_voice_heard";
+  var TURN = {
+    left: 1,
+    right: 1,
+    leftKeep: 1,
+    rightKeep: 1,
+    rightSharp: 1,
+    roundabout: 1,
+    uturn: 1,
+    motorwayOn: 1,
+    motorwayOff: 1,
+    ferryOn: 1,
+    ferryOff: 1,
+    arrive: 1
+  };
   var FALLBACK = {
-    left: "leftKeep",
     leftKeep: "left",
-    rightSharp: "right",
     rightKeep: "right",
+    rightSharp: "right",
     motorwayOff: "right",
-    motorwayOn: "straight",
-    ferryOff: "ferryOn",
-    ferryOn: "straight",
-    recompute: "start",
-    uturn: "left",
-    arrive: "start",
-    gps: "start",
-    start: "straight",
-    straight: "start"
+    ferryOff: "ferryOn"
   };
 
   var packs = {};
-  var all = [];
+  var dur = {};
   var heard = {};
   var ready = false;
   var el = null;
@@ -28,7 +33,6 @@
   var lastAt = 0;
   var said = {};
   var gpsSaid = false;
-  var gpsLost = 0;
 
   function clipUrl(name) {
     var file = String(name || "").replace(/^.*\//, "").replace(/\.ogg$/i, ".mp3");
@@ -54,47 +58,58 @@
     if (!packs[event]) packs[event] = { now: [], ahead: [] };
     var list = packs[event][phase === "ahead" ? "ahead" : "now"];
     if (list.indexOf(url) < 0) list.push(url);
-    if (all.indexOf(url) < 0) all.push(url);
+    var ogg = String(name || "").replace(/^.*\//, "");
+    if (typeof dur[url] !== "number") {
+      var sec = root._voiceDur && root._voiceDur[ogg];
+      if (typeof sec === "number") dur[url] = sec;
+    }
   }
 
   function load() {
     heard = readHeard();
-    return Promise.all([
-      fetch("./voice/catalog.json").then(function (res) { return res.json(); }),
-      fetch("./voice/files.json").then(function (res) { return res.json(); })
-    ]).then(function (pair) {
-      var cat = pair[0] || {};
+    return fetch("./voice/catalog.json").then(function (res) { return res.json(); }).then(function (cat) {
+      root._voiceDur = cat.dur || {};
       Object.keys(cat.files || {}).forEach(function (event) {
-        (cat.files[event] || []).forEach(function (name) { add(event, "now", name); });
+        (cat.files[event] || []).forEach(function (name) {
+          var url = clipUrl(name);
+          dur[url] = Number(cat.dur[name]) || Number(cat.dur[name.replace(".mp3", ".ogg")]) || 3;
+          add(event, "now", name);
+        });
       });
       Object.keys(cat.ahead || {}).forEach(function (event) {
-        (cat.ahead[event] || []).forEach(function (name) { add(event, "ahead", name); });
+        (cat.ahead[event] || []).forEach(function (name) {
+          var url = clipUrl(name);
+          if (typeof dur[url] !== "number") {
+            dur[url] = Number(cat.dur[name]) || Number(cat.dur[name.replace(".mp3", ".ogg")]) || 3;
+          }
+          add(event, "ahead", name);
+        });
       });
-      (pair[1] || []).forEach(function (path) {
-        var url = clipUrl(path);
-        if (url && all.indexOf(url) < 0) {
-          add("start", "now", path);
-        }
-      });
-      ready = all.length > 0;
+      ready = true;
     });
   }
 
-  function listFor(event, phase) {
-    var pack = packs[event];
-    if (pack) {
-      var first = phase === "ahead" ? pack.ahead : pack.now;
-      if (first.length) return first;
-      if (pack.now.length) return pack.now;
-      if (pack.ahead.length) return pack.ahead;
+  function listFor(event, phase, maxSec) {
+    var pack = packs[event] || { now: [], ahead: [] };
+    var raw = phase === "ahead"
+      ? (pack.ahead.length ? pack.ahead : pack.now)
+      : (pack.now.length ? pack.now : pack.ahead);
+    var short = raw.filter(function (url) { return (dur[url] || 99) <= maxSec; });
+    if (short.length) return short;
+    if (raw.length) {
+      return raw.slice().sort(function (a, b) { return (dur[a] || 99) - (dur[b] || 99); }).slice(0, Math.min(4, raw.length));
     }
     var next = FALLBACK[event];
-    if (next && next !== event) return listFor(next, phase);
-    return all;
+    if (next && next !== event) return listFor(next, phase, maxSec);
+    return [];
   }
 
   function spin(event, phase) {
-    var list = listFor(event, phase);
+    var maxSec = phase === "ahead" ? 3.6 : 2.8;
+    if (event === "gps") maxSec = 4;
+    if (event === "start") maxSec = 1.3;
+    if (event === "arrive") maxSec = 4;
+    var list = listFor(event, phase, maxSec);
     if (!list.length) return "";
     var low = Infinity;
     var bag = [];
@@ -158,31 +173,24 @@
     var step = route.steps[i];
     var remain = Math.max(0, step.at + step.distance - traveled);
     var mark = said[i] || (said[i] = {});
-    var kind = step.kind || "straight";
-    if (kind === "arrive" && remain <= 25 && !mark.now) {
-      mark.now = 1;
-      play("arrive", "now");
+    var kind = step.kind || "";
+    if (!TURN[kind]) return;
+    if (kind === "arrive") {
+      if (remain <= 30 && !mark.now) {
+        mark.now = 1;
+        play("arrive", "now");
+      }
       return;
     }
-    if (kind !== "start" && kind !== "straight") {
-      if (!mark.far && remain <= 280 && remain > 110 && step.distance >= 180) {
-        mark.far = 1;
-        play(kind, "ahead");
-        return;
-      }
-      if (!mark.mid && remain <= 110 && remain > 35 && step.distance >= 80) {
-        mark.mid = 1;
-        play(kind, remain > 70 ? "ahead" : "now");
-        return;
-      }
-      if (!mark.now && remain <= 35) {
-        mark.now = 1;
-        play(kind, "now");
-        return;
-      }
+    if (!mark.far && remain <= 240 && remain > 70 && step.distance >= 160) {
+      mark.far = 1;
+      play(kind, "ahead");
+      return;
     }
-    if (Date.now() - lastAt < 12000) return;
-    if (remain > 220 || kind === "start" || kind === "straight") play("start", "now");
+    if (!mark.now && remain <= 40) {
+      mark.now = 1;
+      play(kind, "now");
+    }
   }
 
   function start() {
@@ -190,22 +198,21 @@
   }
 
   function gps(hasFix) {
-    if (!ready) return;
-    if (hasFix) {
-      if (!gpsSaid || (gpsLost && Date.now() - gpsLost > 20000)) play("gps", "now");
-      gpsSaid = true;
-      gpsLost = 0;
-    } else if (gpsSaid && !gpsLost) {
-      gpsLost = Date.now();
-    }
+    if (!ready || !hasFix || gpsSaid) return;
+    gpsSaid = true;
+    play("gps", "now");
   }
 
   function heardCount() {
-    return all.filter(function (url) { return heard[url]; }).length;
+    return Object.keys(heard).length;
   }
 
   function total() {
-    return all.length;
+    var n = 0;
+    Object.keys(packs).forEach(function (k) {
+      n += packs[k].now.length + packs[k].ahead.length;
+    });
+    return n;
   }
 
   root.Voice = {
@@ -217,6 +224,6 @@
     gps: gps,
     heard: heardCount,
     total: total,
-    size: function (event, phase) { return listFor(event, phase).length; }
+    size: function (event, phase) { return listFor(event, phase, 8).length; }
   };
 })(typeof window !== "undefined" ? window : globalThis);

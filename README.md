@@ -1,17 +1,15 @@
 # Navigáció
 
-Telefonos Android-alkalmazás.
+Telefonos Android-alkalmazás, 1.0.1.
 
 ## Letöltés
 
-A tárolóból a nyers fájl a telefonon gyakran beragad. Innen töltsd:
+https://github.com/reiko1866-ui/Navig-ci-/releases/download/apk-2/Navigacio.apk
 
-https://github.com/reiko1866-ui/Navig-ci-/releases/download/apk-1/Navigacio.apk
+Ha ez beragad:
 
-Ha az APK még mindig nem fejeződik be, a tömörített változat:
+https://github.com/reiko1866-ui/Navig-ci-/releases/download/apk-2/Navigacio.zip
 
-https://github.com/reiko1866-ui/Navig-ci-/releases/download/apk-1/Navigacio.zip
+A kiadások: https://github.com/reiko1866-ui/Navig-ci-/releases
 
-A kiadás oldala: https://github.com/reiko1866-ui/Navig-ci-/releases/tag/apk-1
-
-Telepítés után engedd meg az ismeretlen forrást, majd a helyhozzáférést.
+A telepített app a Frissítés gombbal veszi az új kiadást. Első telepítés után engedd a helyet, és hogy ismeretlen forrásból telepíthessen.
