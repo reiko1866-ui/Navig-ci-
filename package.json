@@ -1,0 +1,20 @@
+{
+  "name": "navigacio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Navigáció telefonos alkalmazás",
+  "scripts": {
+    "cap": "cap",
+    "sync": "cap sync android",
+    "open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.2",
+    "@capacitor/app": "^7.0.2",
+    "@capacitor/core": "^7.4.2",
+    "@capacitor/geolocation": "^7.1.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.2"
+  }
+}

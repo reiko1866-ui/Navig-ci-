@@ -1,0 +1,11 @@
+{
+  "appId": "hu.navigacio.app",
+  "appName": "Navigáció",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

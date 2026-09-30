@@ -18,6 +18,7 @@
   var limitShown = "";
   var nextShown = "";
   var trafficShown = "";
+  var gps = { at: 0 };
 
   function $(id) {
     return document.getElementById(id);
@@ -344,8 +345,11 @@
     if (!running || !route) return;
     var dt = Math.min(0.05, (now - lastT) / 1000);
     lastT = now;
-    var pace = window.Traffic ? window.Traffic.pace(route, traveled) : 1;
-    traveled += SPEED * pace * dt;
+    var liveGps = Date.now() - gps.at < 4000;
+    if (!liveGps) {
+      var pace = window.Traffic ? window.Traffic.pace(route, traveled) : 1;
+      traveled += SPEED * pace * dt;
+    }
     paintBanner();
     if (Math.floor(now / 1000) !== Math.floor((now - dt * 1000) / 1000)) {
       considerTraffic(false);
@@ -386,5 +390,52 @@
     raf = requestAnimationFrame(tick);
   });
 
+  function snapTravel(lng, lat) {
+    var best = 0;
+    var bestD = 1e12;
+    var coords = route.coords;
+    var cum = route.cum;
+    for (var i = 0; i < coords.length; i++) {
+      var d = haversine(coords[i], { lng: lng, lat: lat });
+      if (d < bestD) {
+        bestD = d;
+        best = cum[i] || 0;
+      }
+    }
+    if (bestD < 70) traveled = best;
+  }
+
+  function onGps(lat, lng, speed) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    gps.at = Date.now();
+    gps.speed = Number.isFinite(speed) && speed >= 0 ? speed : null;
+    if (!route) {
+      origin = { lng: lng, lat: lat };
+      return;
+    }
+    if (running) snapTravel(lng, lat);
+  }
+
+  function startGps() {
+    var native = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+    if (!native) {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.watchPosition(function (pos) {
+        onGps(pos.coords.latitude, pos.coords.longitude, pos.coords.speed);
+      }, function () {}, { enableHighAccuracy: true, maximumAge: 1000 });
+      return;
+    }
+    var geo = window.Capacitor.registerPlugin("Geolocation");
+    var begin = function () {
+      geo.watchPosition({ enableHighAccuracy: true }, function (pos, err) {
+        if (err || !pos || !pos.coords) return;
+        onGps(pos.coords.latitude, pos.coords.longitude, pos.coords.speed);
+      });
+    };
+    if (geo.requestPermissions) geo.requestPermissions().then(begin).catch(begin);
+    else begin();
+  }
+
   prepareVoices();
+  startGps();
 })();
