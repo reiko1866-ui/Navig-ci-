@@ -161,6 +161,19 @@ tr.active {
   font-size: 16px;
 }
 
+#traffic {
+  position: absolute;
+  z-index: 2;
+  right: 12px;
+  bottom: 64px;
+  margin: 0;
+  background: #fff;
+  border-radius: 10px;
+  padding: 6px 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 #status {
   position: absolute;
   z-index: 2;

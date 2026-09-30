@@ -4,6 +4,7 @@
   var BUDAPEST = { lng: 19.0402, lat: 47.4979 };
   var origin = { lng: BUDAPEST.lng, lat: BUDAPEST.lat };
   var route = null;
+  var destination = null;
   var routeChoices = [];
   var traveled = 0;
   var running = false;
@@ -16,6 +17,7 @@
   var limitToken = 0;
   var limitShown = "";
   var nextShown = "";
+  var trafficShown = "";
 
   function $(id) {
     return document.getElementById(id);
@@ -232,6 +234,29 @@
     $("go").hidden = false;
     setStatus(item.label + " kiválasztva: " + fmtDist(item.distance) + ". Sebességhatár olvasása…");
     loadLimits(item);
+    if (window.Traffic) window.Traffic.arm(route);
+    trafficShown = "";
+    considerTraffic(true);
+  }
+
+  function considerTraffic(forcePaint) {
+    if (!route || !destination || !window.Traffic) return;
+    var pos = placeOnRoute(route, traveled);
+    window.Traffic.consider(route, traveled, pos, destination).then(function (got) {
+      if (got || forcePaint) paintTraffic(true);
+    });
+  }
+
+  function paintTraffic(force) {
+    if (!window.Traffic || !route) return;
+    var text = window.Traffic.label(route, traveled);
+    var extra = window.Traffic.delayAhead(route, traveled);
+    var left = Math.max(0, route.duration * (1 - traveled / Math.max(1, route.length)) + extra);
+    var arrival = text ? text + " · érkezés " + Math.max(1, Math.round(left / 60)) + " perc" : "";
+    if (!force && arrival === trafficShown) return;
+    trafficShown = arrival;
+    $("traffic").hidden = !arrival;
+    $("traffic").textContent = arrival;
   }
 
   function showRouteChoices(list) {
@@ -254,6 +279,7 @@
   }
 
   function plan(dest) {
+    destination = dest;
     setStatus("Útvonal számítása…");
     $("results").hidden = true;
     var url = "https://router.project-osrm.org/route/v1/driving/" +
@@ -318,8 +344,13 @@
     if (!running || !route) return;
     var dt = Math.min(0.05, (now - lastT) / 1000);
     lastT = now;
-    traveled += SPEED * dt;
+    var pace = window.Traffic ? window.Traffic.pace(route, traveled) : 1;
+    traveled += SPEED * pace * dt;
     paintBanner();
+    if (Math.floor(now / 1000) !== Math.floor((now - dt * 1000) / 1000)) {
+      considerTraffic(false);
+      paintTraffic(false);
+    }
     if (traveled >= route.length) {
       stop();
       setStatus("Megérkeztél. Hang: " + voiceFiles.length + " fájl előkészítve, nincs lejátszás.");
