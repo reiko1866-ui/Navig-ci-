@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CartoonNav</string>
+    <string name="title_activity_main">CartoonNav</string>
+    <string name="package_name">com.cartoon.nav</string>
+    <string name="custom_url_scheme">com.cartoon.nav</string>
+</resources>

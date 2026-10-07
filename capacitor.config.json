@@ -1,6 +1,6 @@
 {
-  "appId": "hu.navigacio.app",
-  "appName": "Navigáció",
+  "appId": "com.cartoon.nav",
+  "appName": "CartoonNav",
   "webDir": "www",
   "android": {
     "allowMixedContent": false

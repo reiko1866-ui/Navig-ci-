@@ -9,12 +9,12 @@
     "open": "cap open android"
   },
   "dependencies": {
-    "@capacitor/android": "^7.4.2",
+    "@capacitor/android": "^7.6.9",
     "@capacitor/app": "^7.0.2",
-    "@capacitor/core": "^7.4.2",
+    "@capacitor/core": "^7.6.9",
     "@capacitor/geolocation": "^7.1.4"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.4.2"
+    "@capacitor/cli": "^7.6.9"
   }
 }
