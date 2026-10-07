@@ -1,7 +1,3 @@
-cd ~/Navig-ci-
-
-# 1. Workflow fájl felülírása
-cat << 'EOF' > .github/workflows/android.yml
 name: Build Android APK
 
 on:
@@ -31,25 +27,14 @@ jobs:
           npm install
           npx cap sync android
 
-      - name: Grant execute permission
-        run: |
-          chmod +x android/gradlew
-
       - name: Build with Gradle
         run: |
           cd android
-          ./gradlew assembleDebug --stacktrace
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: CartoonNav-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
-EOF
-
-# 2. Gradlew jogok beállítása és feltolás
-cd android && chmod +x gradlew && git update-index --chmod=+x gradlew
-cd ~/Navig-ci-
-git add .
-git commit -m "Fix gradlew execution permissions"
-git push origin main
