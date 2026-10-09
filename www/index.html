@@ -9,68 +9,76 @@
   <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
   
   <style>
-    body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: #f0f0f0; }
+    body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: #e0e0e0; font-family: sans-serif; }
     #map { width: 100%; height: 100vh; }
     
-    /* Felhasználói felület panel */
+    /* Felső Panel */
     #panel {
       position: absolute;
       top: 15px; left: 15px; right: 15px;
       z-index: 10;
       background: rgba(255, 255, 255, 0.98);
-      padding: 15px;
+      padding: 12px 15px;
       border-radius: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.2);
-      border: 1px solid rgba(0,0,0,0.05);
-    }
-    
-    #info-header {
+      box-shadow: 0 6px 20px rgba(0,0,0,0.25);
       display: flex;
-      align-items: center;
-      margin-bottom: 8px;
+      flex-direction: column;
+      gap: 10px;
     }
     
+    #info-header { display: flex; align-items: center; justify-content: space-between; }
+    #status-container { display: flex; align-items: center; }
     #gps-dot {
-      height: 12px; width: 12px;
-      background-color: #ccc; /* Alapértelmezett szürke */
-      border-radius: 50%;
-      margin-right: 10px;
-      display: inline-block;
+      height: 12px; width: 12px; background-color: #4CAF50;
+      border-radius: 50%; margin-right: 8px; display: inline-block;
     }
-    
-    #gps-dot.active { background-color: #4CAF50; animation: pulse 2s infinite; }
-    #gps-dot.error { background-color: #F44336; }
+    #status-text { font-weight: bold; font-size: 14px; color: #333; }
+    #instruction { font-size: 13px; color: #555; }
 
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
-      70% { box-shadow: 0 0 0 8px rgba(76, 175, 80, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+    /* Címkereső mező és gomb */
+    #search-box {
+      display: flex;
+      gap: 8px;
     }
-
-    #status-text {
-      font-weight: 600; font-size: 16px; color: #333;
+    #search-input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      font-size: 15px;
+      outline: none;
     }
-    
-    #instruction {
-      font-size: 15px; color: #555;
-      margin-top: 4px; line-height: 1.4;
+    #search-input:focus { border-color: #0066ff; }
+    #search-btn {
+      background: #0066ff;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-weight: bold;
+      font-size: 15px;
+      cursor: pointer;
     }
-
-    /* OSRM útvonal stílusa a térképen */
-    .route-line {
-      color: #1a73e8;
-    }
+    #search-btn:active { background: #0044cc; }
   </style>
 </head>
 <body>
 
   <div id="panel">
     <div id="info-header">
-      <span id="gps-dot"></span>
-      <span id="status-text">📍 GPS pozíció keresése...</span>
+      <div id="status-container">
+        <span id="gps-dot"></span>
+        <span id="status-text">📍 GPS: Keresés...</span>
+      </div>
     </div>
-    <div id="instruction">Várj, amíg megtaláljuk a pozíciódat!</div>
+
+    <!-- Címbeíró Mező -->
+    <div id="search-box">
+      <input type="text" id="search-input" placeholder="Írj be egy címet vagy utcát..." onkeypress="handleKeyPress(event)">
+      <button id="search-btn" onclick="searchAddress()">Keresés</button>
+    </div>
+
+    <div id="instruction">Írj be egy címet, vagy bökj a térképre!</div>
   </div>
   
   <div id="map"></div>
@@ -83,175 +91,185 @@
     let lastSpokenInstruction = "";
     let map;
     let userMarker;
-    let watchId;
+    let destMarker;
 
-    // --- 1. Térkép inicializálása ---
-    function initMap() {
-      map = new maplibregl.Map({
-        container: 'map',
-        // OLYAN STÍLUST HASZNÁLUNK, AMIHEZ NEM KELL API KULCS
-        style: 'https://demotiles.maplibre.org/style.json', // Alapértelmezett MapLibre stílus
-        center: [19.0402, 47.4979], // Budapest
-        zoom: 12, // Kezdeti zoom
-        pitch: 0, // Kezdetben lapos nézet
-        bearing: 0,
-        attributionControl: false
-      });
+    // Térkép inicializálása
+    map = new maplibregl.Map({
+      container: 'map',
+      style: {
+        version: 8,
+        sources: {
+          'carto-voyager': {
+            type: 'raster',
+            tiles: [
+              'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+              'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+              'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'
+            ],
+            tileSize: 256,
+            attribution: '&copy; OpenStreetMap &copy; CARTO'
+          }
+        },
+        layers: [{
+          id: 'carto-layer',
+          type: 'raster',
+          source: 'carto-voyager',
+          minzoom: 0,
+          maxzoom: 19
+        }]
+      },
+      center: [19.0402, 47.4979],
+      zoom: 15,
+      pitch: 45
+    });
 
-      // Navigációs gombok hozzáadása
-      map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+    map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
 
-      map.on('load', () => {
-        // Miután betöltött, engedélyezzük a GPS követést
-        startLocationTracking();
-      });
-
-      // Kattintás a térképre -> Útvonaltervezés
-      map.on('click', onMapClick);
-    }
-
-    // --- 2. GPS Helymeghatározás indítása ---
-    function startLocationTracking() {
-      const gpsDot = document.getElementById('gps-dot');
-      const statusText = document.getElementById('status-text');
-      const instructionText = document.getElementById('instruction');
-
-      if (!("geolocation" in navigator)) {
-        statusText.innerText = "⚠️ GPS nem elérhető";
-        gpsDot.className = 'error';
-        return;
-      }
-
-      // Pontos GPS követés beállítása
-      watchId = navigator.geolocation.watchPosition(
+    // GPS Követés
+    if ("geolocation" in navigator) {
+      navigator.geolocation.watchPosition(
         (position) => {
           const lng = position.coords.longitude;
           const lat = position.coords.latitude;
           const heading = position.coords.heading || 0;
           currentPos = [lng, lat];
 
-          // UI Frissítése
-          statusText.innerText = `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-          gpsDot.className = 'active';
-          if (instructionText.innerText === "Várj, amíg megtaláljuk a pozíciódat!") {
-             instructionText.innerText = "Kattints a térképre a célpont kijelöléséhez!";
-          }
+          document.getElementById('status-text').innerText = `📍 GPS csatlakozva`;
 
-          // Felhasználói jelölő (marker) frissítése
           if (userMarker) {
             userMarker.setLngLat(currentPos);
           } else {
-            // Egyedi kék kör a felhasználónak
             const el = document.createElement('div');
-            el.className = 'user-marker';
-            el.style.width = '20px'; el.style.height = '20px';
+            el.style.width = '22px'; el.style.height = '22px';
             el.style.backgroundColor = '#1a73e8';
             el.style.borderRadius = '50%';
             el.style.border = '3px solid white';
-            el.style.boxShadow = '0 0 10px rgba(0,0,0,0.3)';
+            el.style.boxShadow = '0 0 10px rgba(0,0,0,0.4)';
             
             userMarker = new maplibregl.Marker({element: el})
               .setLngLat(currentPos)
               .addTo(map);
           }
 
-          // Kamera mozgatása és döntése (ha mozog)
           map.flyTo({
             center: currentPos,
             zoom: 16,
-            pitch: 55, // 3D nézet döntése
-            bearing: heading, // Haladási irányba forgatás
-            essential: true,
+            pitch: 50,
+            bearing: heading,
             duration: 1000
           });
         },
-        (error) => {
-          console.error("Helymeghatározási hiba:", error);
-          statusText.innerText = "⚠️ Helymeghatározási hiba!";
-          gpsDot.className = 'error';
-          instructionText.innerText = "Ellenőrizd a GPS engedélyeket!";
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        (err) => console.error(err),
+        { enableHighAccuracy: true }
       );
     }
 
-    // --- 3. Magyar felolvasó (Text-to-Speech) ---
+    // Magyar felolvasó
     function speak(text) {
       if ('speechSynthesis' in window && text !== lastSpokenInstruction) {
-        window.speechSynthesis.cancel(); // Előző szöveg megszakítása
+        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'hu-HU'; // Magyar nyelv
+        utterance.lang = 'hu-HU';
         utterance.rate = 1.0;
         window.speechSynthesis.speak(utterance);
         lastSpokenInstruction = text;
       }
     }
 
-    // --- 4. Kattintás és OSRM Útvonaltervezés ---
-    async function onMapClick(e) {
-      if (!currentPos) {
-        alert("Várj, amíg a GPS megtalálja a pozíciódat!");
-        return;
-      }
-
-      const dest = [e.lngLat.lng, e.lngLat.lat];
-      const instructionText = document.getElementById('instruction');
-
-      // OSRM API hívás (autós útvonal, ingyenes)
-      const url = `https://router.project-osrm.org/route/v1/driving/${currentPos[0]},${currentPos[1]};${dest[0]},${dest[1]}?steps=true&geometries=geojson&overview=full`;
-
-      try {
-        instructionText.innerText = "Útvonal tervezése...";
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (!data.routes || data.routes.length === 0) {
-          instructionText.innerText = "❌ Nem található útvonal.";
-          return;
-        }
-
-        const route = data.routes[0];
-        const coords = route.geometry.coordinates;
-
-        // Útvonal kirajzolása a térképre
-        if (map.getSource('route')) {
-          map.getSource('route').setData({
-            type: 'Feature',
-            geometry: { type: 'LineString', coordinates: coords }
-          });
-        } else {
-          map.addSource('route', {
-            type: 'geojson',
-            data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } }
-          });
-
-          map.addLayer({
-            id: 'route-layer',
-            type: 'line',
-            source: 'route',
-            layout: { 'line-join': 'round', 'line-cap': 'round' },
-            paint: { 'line-color': '#1a73e8', 'line-width': 6, 'line-opacity': 0.8 }
-          });
-        }
-
-        // Távolság és hangutasítás
-        const distanceKm = (route.distance / 1000).toFixed(1);
-        const durationMin = Math.round(route.duration / 60);
-        
-        const summaryText = `Útvonal tervezve: ${distanceKm} km, kb. ${durationMin} perc.`;
-        instructionText.innerText = summaryText;
-
-        // Magyar hangbemondás
-        speak(`Útvonal megtervezve. A távolság ${distanceKm.replace('.', ',')} kilométer. Indulhatsz!`);
-
-      } catch (err) {
-        console.error("Útvonaltervezési hiba:", err);
-        instructionText.innerText = "❌ Hiba történt az útvonaltervezés során.";
+    // Enter lenyomására is keressen
+    function handleKeyPress(e) {
+      if (e.key === 'Enter') {
+        searchAddress();
       }
     }
 
-    // Indítás
-    initMap();
+    // Címkeresés OpenStreetMap Nominatim API-val
+    async function searchAddress() {
+      const query = document.getElementById('search-input').value.trim();
+      if (!query) return;
+
+      document.getElementById('instruction').innerText = "Cím keresése...";
+
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=hu&limit=1`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data && data.length > 0) {
+          const destLng = parseFloat(data[0].lon);
+          const destLat = parseFloat(data[0].lat);
+          planRoute([destLng, destLat], data[0].display_name.split(',')[0]);
+        } else {
+          document.getElementById('instruction').innerText = "❌ Nem található ilyen cím!";
+          speak("Nem találtam meg a megadott címet.");
+        }
+      } catch (err) {
+        console.error("Címkeresési hiba:", err);
+        document.getElementById('instruction').innerText = "⚠️ Keresési hiba történt!";
+      }
+    }
+
+    // Kattintás a térképre -> Útvonal
+    map.on('click', (e) => {
+      planRoute([e.lngLat.lng, e.lngLat.lat]);
+    });
+
+    // Útvonaltervező függvény (OSRM)
+    async function planRoute(destCoords, placeName = "") {
+      if (!currentPos) {
+        alert("Várj a GPS pozícióra!");
+        return;
+      }
+
+      const url = `https://router.project-osrm.org/route/v1/driving/${currentPos[0]},${currentPos[1]};${destCoords[0]},${destCoords[1]}?steps=true&geometries=geojson&overview=full`;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.routes && data.routes.length > 0) {
+          const route = data.routes[0];
+          const coords = route.geometry.coordinates;
+
+          // Célpont jelölő
+          if (destMarker) destMarker.remove();
+          destMarker = new maplibregl.Marker({ color: '#ff3333' })
+            .setLngLat(destCoords)
+            .addTo(map);
+
+          // Vonal kirajzolása
+          if (map.getSource('route')) {
+            map.getSource('route').setData({
+              type: 'Feature',
+              geometry: { type: 'LineString', coordinates: coords }
+            });
+          } else {
+            map.addSource('route', {
+              type: 'geojson',
+              data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } }
+            });
+
+            map.addLayer({
+              id: 'route-layer',
+              type: 'line',
+              source: 'route',
+              layout: { 'line-join': 'round', 'line-cap': 'round' },
+              paint: { 'line-color': '#0066ff', 'line-width': 7 }
+            });
+          }
+
+          const dist = (route.distance / 1000).toFixed(1);
+          const mins = Math.round(route.duration / 60);
+          
+          const label = placeName ? `Cél: ${placeName} (${dist} km, ${mins} perc)` : `Útvonal tervezve: ${dist} km, kb. ${mins} perc.`;
+          document.getElementById('instruction').innerText = label;
+          
+          speak(`Útvonal megtervezve. Távolság: ${dist.replace('.', ',')} kilométer. Indulhatsz!`);
+        }
+      } catch (err) {
+        console.error("Hiba az útvonalban:", err);
+      }
+    }
   </script>
 </body>
 </html>
